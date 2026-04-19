@@ -28,8 +28,7 @@ const Sidebar = ({ isMenuOpen, setIsMenuOpen }) => {
       if (!confirm) return;
       const { data } = await axios.post(
         "/api/chat/delete-chat",
-        { chatId },
-        { withCredentials: true }
+        { chatId }
       );
       if (data.createdChat) {
         setChats((prev) => prev.filter((chat) => chat._id !== chatId)); // chats update karo

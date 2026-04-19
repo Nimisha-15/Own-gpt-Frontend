@@ -25,9 +25,7 @@ const Login = () => {
 
     try {
       console.log("API Call:", url, payload);
-      const { data } = await axios.post(url, payload, {
-        withCredentials: true,
-      });
+      const { data } = await axios.post(url, payload);
 
       console.log("API Response:", data);
 

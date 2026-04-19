@@ -1,22 +1,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import axiosInstance from "../config/axios"; // Import the custom instance
 import toast from "react-hot-toast";
-
-// default url
-axios.defaults.baseURL = import.meta.env.VITE_SERVER_URL;
-
-// 🔥 NEW: Global Axios Interceptor for Bearer Tokens
-axios.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-    // console.log(`🚀 Sending Request to ${config.url} with token`);
-  }
-  return config;
-}, (error) => {
-  return Promise.reject(error);
-});
 
 const AppContext = createContext();
 
@@ -38,7 +23,7 @@ export const AppContextProvider = ({ children }) => {
     }
 
     try {
-      const { data } = await axios.get("/api/user/data");
+      const { data } = await axiosInstance.get("/api/user/data");
 
       if (data.success) {
         setUser(data.user);
@@ -65,7 +50,7 @@ export const AppContextProvider = ({ children }) => {
     }
 
     try {
-      const { data } = await axios.post("/api/chat/create-chat");
+      const { data } = await axiosInstance.post("/api/chat/create-chat");
 
       if (data.createdChat) {
         setChats((prev) => [data.createdChat, ...prev]);
@@ -81,7 +66,7 @@ export const AppContextProvider = ({ children }) => {
   // Fetch all user chats
   const fetchUserChats = async () => {
     try {
-      const { data } = await axios.get("/api/chat/get-chat");
+      const { data } = await axiosInstance.get("/api/chat/get-chat");
 
       if (data.success) {
         setChats(data.chats);
@@ -102,7 +87,7 @@ export const AppContextProvider = ({ children }) => {
   // Logout user
   const logout = async () => {
     try {
-      await axios.post("/api/user/logout");
+      await axiosInstance.post("/api/user/logout");
     } catch (err) {
       console.error("Logout API failed:", err);
     } finally {
@@ -155,7 +140,7 @@ export const AppContextProvider = ({ children }) => {
     setTheme,
     createNewchat,
     loadingUser,
-    axios,
+    axios: axiosInstance,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

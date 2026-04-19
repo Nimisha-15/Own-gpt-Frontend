@@ -11,9 +11,7 @@ const Credits = () => {
   // Fetch plans from backend
   const fetchPlans = async () => {
     try {
-      const { data } = await axios.get("/api/payment/plans", {
-        withCredentials: true,
-      });
+      const { data } = await axios.get("/api/payment/plans");
       console.log("Plans API response:", data);
 
       if (data.success && data.plans) {
@@ -36,8 +34,7 @@ const Credits = () => {
     try {
       const { data } = await axios.post(
         "/api/payment/purchase",
-        { planId },
-        { withCredentials: true },
+        { planId }
       );
 
       if (data.success && data.url) {

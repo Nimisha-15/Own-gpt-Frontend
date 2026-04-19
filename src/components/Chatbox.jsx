@@ -29,8 +29,7 @@ const Chatbox = () => {
           chatId: selectedChats._id,
           prompt: currentPrompt,
           isPublished,
-        },
-        { withCredentials: true }
+        }
       );
 
       if (data.success) {
