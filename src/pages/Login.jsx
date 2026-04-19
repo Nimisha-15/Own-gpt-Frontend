@@ -31,9 +31,10 @@ const Login = () => {
 
       console.log("API Response:", data);
 
-      // 🔥 FIXED SAFE CHECK
-      if (data && (data.success === true || data.success !== false)) {
-        setUser(data.user || data.data?.user || data);
+      // 🔥 FIXED: Token Storage and User State
+      if (data && data.success) {
+        localStorage.setItem("token", data.token); // Store token
+        setUser(data.user);
         toast.success(data.message || "Success!");
         navigate("/");
       } else {

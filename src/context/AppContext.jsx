@@ -6,6 +6,15 @@ import toast from "react-hot-toast";
 // default url
 axios.defaults.baseURL = import.meta.env.VITE_SERVER_URL;
 
+// 🔥 NEW: Global Axios Interceptor for Bearer Tokens
+axios.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 const AppContext = createContext();
 
 export const AppContextProvider = ({ children }) => {
@@ -15,21 +24,27 @@ export const AppContextProvider = ({ children }) => {
   const [chats, setChats] = useState([]);
   const [selectedChats, setSelectedChats] = useState(null);
   const [theme, setTheme] = useState(localStorage.getItem("theme") || "light");
-  const [loadingUser, setLoadingUser] = useState(true); // Fixed typo: setloadingUser → setLoadingUser
+  const [loadingUser, setLoadingUser] = useState(true);
 
   // Fetch authenticated user
   const fetchUser = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setLoadingUser(false);
+      return;
+    }
+
     try {
-      const { data } = await axios.get("/api/user/data", {
-        withCredentials: true,
-      });
+      const { data } = await axios.get("/api/user/data");
 
       if (data.success) {
         setUser(data.user);
       } else {
+        localStorage.removeItem("token");
         setUser(null);
       }
     } catch (error) {
+      localStorage.removeItem("token");
       setUser(null);
     } finally {
       setLoadingUser(false);
@@ -38,15 +53,16 @@ export const AppContextProvider = ({ children }) => {
 
   // Create a new chat
   const createNewchat = async () => {
-    if (!user) {
+    const token = localStorage.getItem("token");
+    console.log("🛠️ Attempting to create chat. Token present:", !!token);
+
+    if (!user || !token) {
       toast.error("Login to create a new chat");
       return;
     }
 
     try {
-      const { data } = await axios.get("/api/chat/create-chat", {
-        withCredentials: true,
-      });
+      const { data } = await axios.post("/api/chat/create-chat");
 
       if (data.createdChat) {
         setChats((prev) => [data.createdChat, ...prev]);
@@ -54,6 +70,7 @@ export const AppContextProvider = ({ children }) => {
         navigate("/");
       }
     } catch (error) {
+      console.error("🚨 Create Chat Error:", error.response?.data || error.message);
       toast.error("Failed to create chat");
     }
   };
@@ -61,9 +78,7 @@ export const AppContextProvider = ({ children }) => {
   // Fetch all user chats
   const fetchUserChats = async () => {
     try {
-      const { data } = await axios.get("/api/chat/get-chat", {
-        withCredentials: true,
-      });
+      const { data } = await axios.get("/api/chat/get-chat");
 
       if (data.success) {
         setChats(data.chats);
@@ -84,10 +99,11 @@ export const AppContextProvider = ({ children }) => {
   // Logout user
   const logout = async () => {
     try {
-      await axios.post("/api/user/logout", {}, { withCredentials: true });
+      await axios.post("/api/user/logout");
     } catch (err) {
       console.error("Logout API failed:", err);
     } finally {
+      localStorage.removeItem("token");
       setUser(null);
       setChats([]);
       setSelectedChats(null);
