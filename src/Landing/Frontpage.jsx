@@ -1,9 +1,12 @@
 import Spline from "@splinetool/react-spline";
 import Navbar from "../components/Navbar";
+import About from "../Landing/About";
+import Support from "../Landing/Support";
+import Contact from "../Landing/Contact";
 
 const Frontpage = () => {
   return (
-    <div className="h-screen bg-white  dark:bg-black">
+    <div className="min-h-screen bg-white dark:bg-black">
       {/* PAGE CONTAINER */}
       <div
         className="
@@ -41,6 +44,19 @@ const Frontpage = () => {
             </div>
           </section>
         </div>
+
+        {/* ABOUT SECTION */}
+        <section id="about">
+          <About />
+        </section>
+
+        <section id="support" className="scroll-mt-24">
+          <Support />
+        </section>
+
+        <section id="contact" className="scroll-mt-24">
+          <Contact />
+        </section>
       </div>
     </div>
   );

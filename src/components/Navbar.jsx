@@ -27,28 +27,38 @@ const Navbar = () => {
     setDarkMode(!darkMode);
   };
 
+  const scrollToSection = (id) => {
+    const section = document.getElementById(id);
+    if (section) {
+      section.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
   return (
-    <nav className="flex items-center justify-between px-7 py-3 bg-white  dark:bg-black  text-black dark:text-white">
+    <nav className="fixed top-0 left-0 w-full z-50 flex items-center justify-between px-7 py-3 bg-white/70 dark:bg-black/70 backdrop-blur-lg text-black dark:text-white border-b border-gray-200 dark:border-gray-800">
       {/* Left - Logo */}
       <h1 className="text-2xl font-extrabold">MyGPT</h1>
 
       {/* Center - Navigation */}
       <div className="hidden md:flex space-x-10 font-medium">
-        <Link to="/about" className="hover:text-gray-400">
+        <button
+          onClick={() => scrollToSection("about")}
+          className="hover:text-gray-400"
+        >
           About
-        </Link>
-        <Link to="/products" className="hover:text-gray-400">
-          Products
-        </Link>
-        <Link to="/components" className="hover:text-gray-400">
-          Components
-        </Link>
-        <Link to="/support" className="hover:text-gray-400">
+        </button>
+        <button
+          onClick={() => scrollToSection("support")}
+          className="hover:text-gray-400"
+        >
           Support
-        </Link>
-        <Link to="/contact" className="hover:text-gray-400">
+        </button>
+        <button
+          onClick={() => scrollToSection("contact")}
+          className="hover:text-gray-400"
+        >
           Contact
-        </Link>
+        </button>
       </div>
 
       {/* Right - Theme Toggle + Auth */}
