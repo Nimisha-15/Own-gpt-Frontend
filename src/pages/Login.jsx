@@ -1,128 +1,426 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useAppContext } from "../context/AppContext";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
+import ThreeDBackground from "../components/ui/ThreeDBackground";
+import { GoogleLogin } from "@react-oauth/google";
 
+/* ─────────────────────────────────────────────────────────────────
+   InputField extracted OUTSIDE Login so it is never re-created
+   on parent re-renders — this stops the animation re-triggering
+───────────────────────────────────────────────────────────────── */
+const InputField = ({
+  label,
+  field,
+  type = "text",
+  placeholder,
+  delay = 0,
+  value,
+  error,
+  onChange,
+  showPassword,
+  onTogglePassword,
+}) => (
+  <div
+    className="mb-4"
+    style={{ animation: `fadeInUp 0.6s ease-out ${delay}s both` }}
+  >
+    <label className="block text-sm font-medium text-gray-300 mb-2">
+      {label}
+    </label>
+    <div className="relative">
+      <input
+        type={
+          field === "password" ? (showPassword ? "text" : "password") : type
+        }
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(field, e.target.value)}
+        className={`w-full px-4 py-3 bg-white/5 backdrop-blur-sm border rounded-xl text-white
+          placeholder-gray-500 outline-none transition duration-300
+          ${
+            error
+              ? "border-red-500/50 focus:border-red-400 focus:shadow-lg focus:shadow-red-500/20"
+              : "border-white/10 focus:border-indigo-400/50 focus:shadow-lg focus:shadow-indigo-500/20"
+          }`}
+      />
+      {field === "password" && (
+        <button
+          type="button"
+          onClick={onTogglePassword}
+          className="absolute inset-y-0 right-0 pr-4 flex items-center
+            text-gray-400 hover:text-gray-200 text-xs font-medium transition-colors"
+        >
+          {showPassword ? "Hide" : "Show"}
+        </button>
+      )}
+    </div>
+    {error && (
+      <p className="mt-1 text-sm text-red-400 animate-shake">{error}</p>
+    )}
+  </div>
+);
+
+/* ─────────────────────────────────────────────────────────────────
+   Login Page
+───────────────────────────────────────────────────────────────── */
 const Login = () => {
-  const [state, setState] = useState("login");
+  const [mode, setMode] = useState("login");
+  const [isLoading, setIsLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
-    email: "",
+    email: localStorage.getItem("remembered_email") || "",
     password: "",
   });
+
   const navigate = useNavigate();
   const { axios, setUser } = useAppContext();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
+  /* ── Validation ── */
+  const validateEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+  const validatePassword = (v) => v.length >= 6;
+  const validateName = (v) => v.trim().length >= 2;
 
-    const url = state === "login" ? "/api/user/login" : "/api/user/register";
-    const payload =
-      state === "login"
-        ? { email: formData.email, password: formData.password }
-        : formData;
+  const validateForm = useCallback(() => {
+    const errs = {};
 
+    if (!formData.email.trim()) errs.email = "Email is required";
+    else if (!validateEmail(formData.email)) errs.email = "Enter a valid email";
+
+    if (!formData.password.trim()) errs.password = "Password is required";
+    else if (!validatePassword(formData.password))
+      errs.password = "Min 6 characters";
+
+    if (mode === "register") {
+      if (!formData.name.trim()) errs.name = "Name is required";
+      else if (!validateName(formData.name)) errs.name = "Min 2 characters";
+    }
+
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  }, [formData, mode]);
+
+  /* ── Input change handler ── */
+  const handleInputChange = useCallback((field, value) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    setErrors((prev) => ({ ...prev, [field]: "" })); // clear field error on type
+  }, []);
+
+  // Google OAuth Handler
+
+  const handleGoogleSuccess = async (credentialResponse) => {
     try {
-      console.log("API Call:", url, payload);
-      const { data } = await axios.post(url, payload);
+      const { data } = await axios.post("/api/user/google-login", {
+        credential: credentialResponse.credential,
+      });
 
-      console.log("API Response:", data);
-
-      // 🔥 FIXED: Token Storage and User State
-      if (data && data.success) {
-        localStorage.setItem("token", data.token); // Store token
+      if (data.success) {
+        localStorage.setItem("token", data.token);
         setUser(data.user);
-        toast.success(data.message || "Success!");
+        toast.success("Logged in successfully!");
         navigate("/");
-      } else {
-        toast.error(data?.message || "Registration/Login failed");
       }
     } catch (error) {
-      console.error("Login Error:", error.response?.data);
-      toast.error(error.response?.data?.message || "Server error");
+      toast.error(error.response?.data?.message || "Google login failed");
     }
   };
 
-  const handleInputChange = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+  /* ── Submit ── */
+  const handleSubmit = useCallback(
+    async (e) => {
+      e.preventDefault();
+      if (isLoading || !validateForm()) {
+        if (!validateForm()) toast.error("Please fix the errors in the form");
+        return;
+      }
+
+      setIsLoading(true);
+
+      const url = mode === "login" ? "/api/user/login" : "/api/user/register";
+      const payload =
+        mode === "login"
+          ? { email: formData.email.trim(), password: formData.password }
+          : {
+              name: formData.name.trim(),
+              email: formData.email.trim(),
+              password: formData.password,
+            };
+
+      try {
+        const { data } = await axios.post(url, payload);
+
+        if (data?.success) {
+          localStorage.setItem("token", data.token);
+          rememberMe
+            ? localStorage.setItem("remembered_email", formData.email)
+            : localStorage.removeItem("remembered_email");
+
+          setUser(data.user);
+          toast.success(data.message || "Welcome! 🎉");
+          navigate("/");
+        } else {
+          toast.error(data?.message || "Authentication failed");
+          setIsLoading(false);
+        }
+      } catch (err) {
+        toast.error(
+          err.response?.data?.message || err.message || "Server error",
+        );
+        setIsLoading(false);
+      }
+    },
+    [
+      isLoading,
+      mode,
+      formData,
+      rememberMe,
+      axios,
+      setUser,
+      navigate,
+      validateForm,
+    ],
+  );
+
+  /* ── Switch auth mode ── */
+  const switchMode = () => {
+    setMode((m) => (m === "login" ? "register" : "login"));
+    setErrors({});
+    setShowPassword(false);
+  };
+
+  /* ── Shared InputField props ── */
+  const fieldProps = {
+    value: (field) => formData[field],
+    error: (field) => errors[field],
+    onChange: handleInputChange,
+    showPassword,
+    onTogglePassword: () => setShowPassword((v) => !v),
   };
 
   return (
-    <div className="h-screen w-full flex p-6">
-      <div className="hidden md:block w-1/2">
-        <img
-          className="h-full w-full object-cover"
-          src="https://images.unsplash.com/photo-1766582888708-04ab69f2277a?q=80&w=1036&auto=format&fit=crop"
-          alt="login"
+    <div className="min-h-screen w-full bg-gradient-to-br from-gray-950 via-gray-900 to-black flex overflow-hidden">
+      {/* ── CSS Animations ── */}
+      <style>{`
+        @keyframes blob {
+          0%, 100% { transform: translate(0,0) scale(1); }
+          33%       { transform: translate(30px,-50px) scale(1.1); }
+          66%       { transform: translate(-20px,20px) scale(0.9); }
+        }
+        @keyframes fadeInUp {
+          from { opacity:0; transform:translateY(20px); }
+          to   { opacity:1; transform:translateY(0); }
+        }
+        @keyframes slideDown {
+          from { opacity:0; transform:translateY(-10px); }
+          to   { opacity:1; transform:translateY(0); }
+        }
+        @keyframes gradientShift {
+          0%,100% { background-position:0% 50%; }
+          50%     { background-position:100% 50%; }
+        }
+        @keyframes shake {
+          0%,100% { transform:translateX(0); }
+          25%     { transform:translateX(-4px); }
+          75%     { transform:translateX(4px); }
+        }
+        .animate-blob   { animation: blob 7s infinite; }
+        .animate-shake  { animation: shake 0.3s ease-in-out; }
+      `}</style>
+
+      {/* ── Blob background ── */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-1/2 -left-1/2 w-96 h-96 bg-indigo-600 opacity-20 rounded-full blur-3xl animate-blob" />
+        <div
+          className="absolute -bottom-1/2 -right-1/2 w-96 h-96 bg-purple-600 opacity-20 rounded-full blur-3xl animate-blob"
+          style={{ animationDelay: "2s" }}
+        />
+        <div
+          className="absolute top-1/2 left-1/2 w-96 h-96 bg-indigo-600 opacity-10 rounded-full blur-3xl animate-blob"
+          style={{ animationDelay: "4s" }}
         />
       </div>
 
-      <div className="flex w-full md:w-1/2 items-center justify-center bg-gray-950">
+      {/* ── Right – Form ── */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 relative z-10">
         <form
           onSubmit={handleSubmit}
-          className="w-full max-w-md bg-gray-900 border border-gray-800 rounded-2xl px-8 py-10"
+          className="w-full max-w-md relative"
+          style={{ animation: "fadeInUp 0.6s ease-out 0.2s both" }}
         >
-          <h1 className="text-white text-3xl font-medium text-center">
-            {state === "login" ? "Login" : "Sign up"}
-          </h1>
-          <p className="text-gray-400 text-sm mt-2 text-center">
-            Please sign in to continue
-          </p>
+          {/* Glassmorphic card */}
+          <div className="absolute inset-0 bg-white/5 backdrop-blur-xl rounded-3xl border border-white/10" />
 
-          {state === "register" && (
-            <div className="flex items-center mt-6 bg-gray-800 border border-gray-700 h-12 rounded-full pl-6 gap-2">
-              <input
-                type="text"
-                placeholder="Name"
-                className="w-full text-white outline-none bg-transparent"
-                value={formData.name}
-                onChange={(e) => handleInputChange("name", e.target.value)}
-                required
-              />
+          <div className="relative p-8 md:p-10">
+            {/* Gradient top bar */}
+            <div
+              className="absolute top-0 left-8 right-8 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 rounded-full blur-sm"
+              style={{ animation: "gradientShift 3s ease infinite" }}
+            />
+
+            {/* Header */}
+            <div
+              className="text-center mb-8"
+              style={{ animation: "slideDown 0.5s ease-out" }}
+            >
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-white via-white to-gray-200 bg-clip-text text-transparent mb-3">
+                {mode === "login" ? "Welcome Back" : "Create Account"}
+              </h1>
+              <p className="text-gray-400 text-sm md:text-base leading-relaxed">
+                {mode === "login"
+                  ? "Sign in to access your AI chat"
+                  : "Join our community to start chatting"}
+              </p>
             </div>
-          )}
 
-          <div className="flex items-center mt-4 bg-gray-800 border border-gray-700 h-12 rounded-full pl-6 gap-2">
-            <input
+            {/* ── Fields ── */}
+            {mode === "register" && (
+              <InputField
+                label="Full Name"
+                field="name"
+                placeholder="John Doe"
+                delay={0.2}
+                value={formData.name}
+                error={errors.name}
+                onChange={handleInputChange}
+                showPassword={showPassword}
+                onTogglePassword={() => setShowPassword((v) => !v)}
+              />
+            )}
+
+            <InputField
+              label="Email Address"
+              field="email"
               type="email"
-              placeholder="Email id"
-              className="w-full bg-transparent text-white placeholder-gray-400 outline-none"
+              placeholder="you@example.com"
+              delay={mode === "register" ? 0.3 : 0.2}
               value={formData.email}
-              onChange={(e) => handleInputChange("email", e.target.value)}
-              required
+              error={errors.email}
+              onChange={handleInputChange}
+              showPassword={showPassword}
+              onTogglePassword={() => setShowPassword((v) => !v)}
             />
-          </div>
 
-          <div className="flex items-center mt-4 bg-gray-800 border border-gray-700 h-12 rounded-full pl-6 gap-2">
-            <input
+            <InputField
+              label="Password"
+              field="password"
               type="password"
-              placeholder="Password"
-              className="w-full bg-transparent text-white placeholder-gray-400 outline-none"
+              placeholder="Enter your password"
+              delay={mode === "register" ? 0.4 : 0.3}
               value={formData.password}
-              onChange={(e) => handleInputChange("password", e.target.value)}
-              required
+              error={errors.password}
+              onChange={handleInputChange}
+              showPassword={showPassword}
+              onTogglePassword={() => setShowPassword((v) => !v)}
             />
+
+            {/* Remember me & Forgot */}
+            {mode === "login" && (
+              <div
+                className="flex items-center justify-between mb-6"
+                style={{ animation: "fadeInUp 0.6s ease-out 0.5s both" }}
+              >
+                <label className="flex items-center cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="w-4 h-4 bg-white/5 border border-white/20 rounded accent-indigo-500 cursor-pointer"
+                  />
+                  <span className="ml-2 text-sm text-gray-400 group-hover:text-gray-300 transition-colors">
+                    Remember me
+                  </span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => toast.info("Password reset coming soon!")}
+                  className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors font-medium"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            )}
+
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={isLoading}
+              style={{ animation: "fadeInUp 0.6s ease-out 0.6s both" }}
+              className={`w-full py-3 rounded-xl font-semibold text-white transition duration-300
+                flex items-center justify-center gap-2 mb-6
+                ${
+                  isLoading
+                    ? "bg-gray-700/50 cursor-not-allowed opacity-50"
+                    : "bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 shadow-lg hover:shadow-indigo-500/50 hover:scale-105 active:scale-95"
+                }`}
+            >
+              {isLoading ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Processing...</span>
+                </>
+              ) : (
+                <span>{mode === "login" ? "Sign In" : "Create Account"}</span>
+              )}
+            </button>
+
+            {/* Divider */}
+            <div
+              className="flex items-center gap-4 mb-6"
+              style={{ animation: "fadeInUp 0.6s ease-out 0.7s both" }}
+            >
+              <div className="flex-1 h-px bg-white/10" />
+              <span className="text-gray-500 text-xs font-medium">
+                Or continue with
+              </span>
+              <div className="flex-1 h-px bg-white/10" />
+            </div>
+
+            {/* Social buttons */}
+            <div
+              className="mb-8 flex flex-col gap-4 items-center"
+              style={{ animation: "fadeInUp 0.6s ease-out 0.8s both" }}
+            >
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={() => toast.error("Google Login Failed")}
+                theme="filled_black"
+                shape="pill"
+                size="large"
+                width="320"
+              />
+
+              <button
+                type="button"
+                className="w-full py-3 px-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-white"
+                onClick={() => toast("GitHub login coming soon")}
+              >
+                Continue with GitHub
+              </button>
+            </div>
+
+            {/* Toggle mode */}
+            <div
+              className="text-center pt-6 border-t border-white/10"
+              style={{ animation: "fadeInUp 0.6s ease-out 0.9s both" }}
+            >
+              <p className="text-gray-400 text-sm">
+                {mode === "login"
+                  ? "Don't have an account?"
+                  : "Already have an account?"}
+                <button
+                  type="button"
+                  onClick={switchMode}
+                  className="ml-2 text-indigo-400 hover:text-indigo-300 font-semibold
+                    transition-colors duration-300 hover:underline"
+                >
+                  {mode === "login" ? "Sign up" : "Sign in"}
+                </button>
+              </p>
+            </div>
           </div>
-
-          <button
-            type="submit"
-            className="mt-6 w-full h-11 rounded-full text-white bg-indigo-600 hover:bg-indigo-500 transition"
-          >
-            {state === "login" ? "Login" : "Sign up"}
-          </button>
-
-          <p
-            className="text-gray-400 text-sm mt-6 text-center cursor-pointer"
-            onClick={() => setState(state === "login" ? "register" : "login")}
-          >
-            {state === "login"
-              ? "Don't have an account?"
-              : "Already have an account?"}
-            <span className="text-indigo-400 hover:underline ml-1">
-              click here
-            </span>
-          </p>
         </form>
       </div>
     </div>

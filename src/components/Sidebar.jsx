@@ -1,10 +1,14 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useAppContext } from "../context/AppContext";
 import { assets } from "../assets/assets";
-import moment from "moment";
+import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime";
+
 import custom_logo from "../assets/custom_logo.svg";
 import toast from "react-hot-toast";
+import { useNavigate } from "react-router-dom";
 
+dayjs.extend(relativeTime);
 const Sidebar = ({ isMenuOpen, setIsMenuOpen }) => {
   const {
     chats,
@@ -12,13 +16,14 @@ const Sidebar = ({ isMenuOpen, setIsMenuOpen }) => {
     theme,
     setTheme,
     user,
-    navigate,
     logout,
     createNewchat,
     setChats,
     axios,
     fetchUserChats,
   } = useAppContext();
+
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
 
   const deleteChat = async (e, chatId) => {
@@ -26,17 +31,19 @@ const Sidebar = ({ isMenuOpen, setIsMenuOpen }) => {
       e.stopPropagation();
       const confirm = window.confirm("are u sure u want to delete this chat?");
       if (!confirm) return;
-      const { data } = await axios.post(
-        "/api/chat/delete-chat",
-        { chatId }
-      );
-      if (data.createdChat) {
-        setChats((prev) => prev.filter((chat) => chat._id !== chatId)); // chats update karo
-        await fetchUserChats();
-        toast.success(data.message);
+      const { data } = await axios.post("/api/chat/delete-chat", { chatId });
+      if (data.success || data.createdChat) {
+        // Update local state immediately
+        setChats((prev) => prev.filter((chat) => chat._id !== chatId));
+        // Clear selected chat if it was the deleted one
+        setSelectedChats(null);
+
+        // Navigate to home
+        navigate("/");
+        toast.success(data.message || "Chat deleted successfully");
       }
     } catch (error) {
-      toast.error(error.message);
+      toast.error(error.response?.data?.message || error.message);
     }
   };
 
@@ -92,7 +99,7 @@ const Sidebar = ({ isMenuOpen, setIsMenuOpen }) => {
               ? chat.messages[0].content
                   .toLowerCase()
                   .includes(search.toLowerCase())
-              : chat.name.toLowerCase().includes(search.toLowerCase())
+              : chat.name.toLowerCase().includes(search.toLowerCase()),
           )
           .map((chat) => (
             <div
@@ -112,7 +119,7 @@ const Sidebar = ({ isMenuOpen, setIsMenuOpen }) => {
                 </p>
 
                 <p className="text-xs text-gray-500 dark:text-[#B1A6C0]">
-                  {moment(chat.updatedAt).fromNow()}
+                  {dayjs(chat.updatedAt).fromNow()}
                 </p>
               </div>
               <img
@@ -128,8 +135,6 @@ const Sidebar = ({ isMenuOpen, setIsMenuOpen }) => {
             </div>
           ))}
       </div>
-
-      {/*  Images  */}
 
       <div
         onClick={() => {
@@ -186,7 +191,7 @@ const Sidebar = ({ isMenuOpen, setIsMenuOpen }) => {
       </div>
 
       {/* User Account  */}
-      <div className="flex items-center gap-3 p-2 mt-3 border border-gray-600 dark:border-white/15 rounded-md cursor-pointer group bg-[#82b5d9]/30 dark:bg-[#072024] ">
+      {/* <div className="flex items-center gap-3 p-2 mt-3 border border-gray-600 dark:border-white/15 rounded-md cursor-pointer group bg-[#82b5d9]/30 dark:bg-[#072024] ">
         <img src={assets.user_icon} className=" w-9 rounded-full  " />
         <p className="flex-1 text-md dark:text-[#eaecec] truncate">
           {user ? user.name : "Login your Account "}
@@ -199,6 +204,24 @@ const Sidebar = ({ isMenuOpen, setIsMenuOpen }) => {
             alt="Logout"
           />
         )}
+      </div> */}
+
+      <div
+        onClick={() => navigate("/profile")}
+        className="flex items-center justify-between p-4 rounded-xl cursor-pointer hover:bg-slate-800 transition"
+      >
+        <div className="flex items-center gap-3">
+          <img
+            src={assets.user_icon}
+            className="w-10 h-10 rounded-full"
+            alt=""
+          />
+
+          <div>
+            <p className="font-medium">{user.name}</p>
+            <p className="text-xs text-gray-400">{user.email}</p>
+          </div>
+        </div>
       </div>
 
       <img

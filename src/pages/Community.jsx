@@ -29,7 +29,7 @@ const Community = () => {
   if (loading) return <Loading />;
 
   return (
-    <div className="p-9 pt-12 xl:px-12 2xl-px-15 w-full  h-full overflow-y-scroll">
+    <div className="min-h-screen p-6 pt-12 xl:px-12 2xl-px-15 w-full  h-full overflow-y-scroll">
       <h2 className="text-xl font-semibold mb-6 text-gray-800 dark:text-cyan-50 ">
         Created Images
       </h2>

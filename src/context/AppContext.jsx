@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import axiosInstance from "../config/axios"; // Import the custom instance
 import toast from "react-hot-toast";
@@ -58,7 +58,10 @@ export const AppContextProvider = ({ children }) => {
         navigate("/");
       }
     } catch (error) {
-      console.error("🚨 Create Chat Error:", error.response?.data || error.message);
+      console.error(
+        "🚨 Create Chat Error:",
+        error.response?.data || error.message,
+      );
       toast.error("Failed to create chat");
     }
   };
@@ -68,19 +71,25 @@ export const AppContextProvider = ({ children }) => {
     try {
       const { data } = await axiosInstance.get("/api/chat/get-chat");
 
-      if (data.success) {
-        setChats(data.chats);
+      if (!data.success) return;
 
-        if (data.chats.length === 0) {
-          await createNewchat(); // Auto-create first chat if none exist
-        } else {
-          setSelectedChats(data.chats[0]); // Select the most recent chat
+      setChats(data.chats);
+
+      setSelectedChats((prev) => {
+        if (prev) {
+          const existing = data.chats.find((chat) => chat._id === prev._id);
+
+          if (existing) return existing;
         }
+
+        return data.chats[0] || null;
+      });
+
+      if (data.chats.length === 0) {
+        await createNewchat();
       }
     } catch (error) {
       toast.error("Failed to fetch chats");
-      setChats([]);
-      setSelectedChats(null);
     }
   };
 
@@ -125,24 +134,26 @@ export const AppContextProvider = ({ children }) => {
 
   // Removed empty useEffect
 
-  const value = {
-    navigate,
-    user,
-    setUser,
-    fetchUser,
-    fetchUserChats,
-    logout,
-    chats,
-    setChats,
-    selectedChats,
-    setSelectedChats,
-    theme,
-    setTheme,
-    createNewchat,
-    loadingUser,
-    axios: axiosInstance,
-  };
-
+  const value = useMemo(
+    () => ({
+      navigate,
+      user,
+      setUser,
+      fetchUser,
+      fetchUserChats,
+      logout,
+      chats,
+      setChats,
+      selectedChats,
+      setSelectedChats,
+      theme,
+      setTheme,
+      createNewchat,
+      loadingUser,
+      axios: axiosInstance,
+    }),
+    [navigate, user, chats, selectedChats, theme, loadingUser],
+  );
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };
 
