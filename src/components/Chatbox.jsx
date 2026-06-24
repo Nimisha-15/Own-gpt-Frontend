@@ -3,6 +3,7 @@ import { useAppContext } from "../context/AppContext";
 import { assets } from "../assets/assets";
 import Message from "./Message";
 import toast from "react-hot-toast";
+import { PromptInputBox } from "./PromptInputBox";
 
 const Chatbox = () => {
   const containerRef = useRef(null);
@@ -28,6 +29,20 @@ const Chatbox = () => {
       });
     }
   }, [messages, loading]);
+
+  const handleSend = async (message) => {
+    if (!message.trim()) return;
+
+    const fakeEvent = {
+      preventDefault: () => {},
+    };
+
+    setPrompt(message);
+
+    setTimeout(() => {
+      onSubmit(fakeEvent);
+    }, 0);
+  };
 
   const onSubmit = useCallback(
     async (e) => {
@@ -171,46 +186,17 @@ const Chatbox = () => {
         </label>
       )}
 
-      {/* ── PROMPT INPUT ── */}
-      <form
-        onSubmit={onSubmit}
-        className="bg-[#75a4add8]/20 dark:bg-[#583790]/30 border border-primary dark:border-[#80609F]/30 rounded-full w-full max-w-2xl p-3 pl-4 mx-auto flex gap-4 items-center"
-      >
-        {/* Mode selector */}
-        <select
-          value={mode}
-          onChange={(e) => setMode(e.target.value)}
-          className="text-sm pl-2 pr-2 outline-none bg-transparent dark:bg-purple-900 rounded"
-        >
-          <option value="text">Text</option>
-          <option value="image">Image</option>
-        </select>
-
-        {/* Text input */}
-        <input
-          type="text"
-          placeholder="Write the prompt..."
-          className="flex-1 w-full text-sm outline-none bg-transparent"
-          required
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          onKeyDown={handleKeyDown}
+      <div className="max-w-3xl mx-auto w-full">
+        <PromptInputBox
+          isLoading={loading}
+          placeholder={
+            mode === "image" ? "Describe the image..." : "Ask anything..."
+          }
+          onSend={handleSend}
         />
+      </div>
 
-        {/* Send / Stop button */}
-        <button
-          type="submit"
-          disabled={loading || !prompt.trim()}
-          className="disabled:opacity-50 transition-opacity"
-          aria-label={loading ? "Stop" : "Send"}
-        >
-          <img
-            src={loading ? assets.stop_icon : assets.send_icon}
-            className="w-8 cursor-pointer"
-            alt={loading ? "Stop" : "Send"}
-          />
-        </button>
-      </form>
+      {/* jjj */}
     </div>
   );
 };

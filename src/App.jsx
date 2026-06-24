@@ -5,6 +5,7 @@ import Chatbox from "./components/Chatbox";
 import Credits from "./pages/Credits";
 import Community from "./pages/Community";
 import Login from "./pages/Login";
+import Signin from "./pages/Signin";
 import Loading from "./pages/Loading";
 import { assets } from "./assets/assets";
 import { useAppContext } from "./context/AppContext";
@@ -46,8 +47,8 @@ const PublicLayout = () => (
   <Routes>
     <Route path="/" element={<Frontpage />} />
     <Route path="/login" element={<Login />} />
-    <Route path="/signup" element={<Login />} />
-    {/* Unknown public routes → home */}
+    <Route path="/signup" element={<Signin />} />
+
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes>
 );
