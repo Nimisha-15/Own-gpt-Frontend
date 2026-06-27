@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const axiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_SERVER_URL || "https://own-gpt-bxcm.onrender.com",
+  baseURL: import.meta.env.VITE_SERVER_URL || "https://own-gpt-1.onrender.com/",
 });
 
 // Global Request Interceptor
